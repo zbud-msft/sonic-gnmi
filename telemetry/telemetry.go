@@ -275,19 +275,19 @@ func iNotifyCertMonitoring(watcher *fsnotify.Watcher, telemetryCfg *TelemetryCon
 	telemetryCertDirectory := filepath.Dir(*telemetryCfg.ServerCert)
 
 	log.V(1).Infof("Begin cert monitoring on %s", telemetryCertDirectory)
-
-	err := watcher.Add(telemetryCertDirectory) // Adding watcher to cert directory
-	if err != nil {
-		log.Errorf("Received error when adding watcher to cert directory: %v", err)
-		serverControlSignal <- ServerStop
-		return
-	}
-
-	if testReadySignal != nil { // for testing only
-		testReadySignal <- 0
-	}
-
+	
 	go func() {
+		err := watcher.Add(telemetryCertDirectory) // Adding watcher to cert directory
+		if err != nil {
+			log.Errorf("Received error when adding watcher to cert directory: %v", err)
+			serverControlSignal <- ServerStop
+			return
+		}
+
+		if testReadySignal != nil { // for testing only
+			testReadySignal <- 0
+		}
+
 		for {
 			select {
 			case event := <-watcher.Events:
