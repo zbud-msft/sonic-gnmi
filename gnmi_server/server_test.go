@@ -132,7 +132,13 @@ func createServer(t *testing.T, port int64) *Server {
 	}
 
 	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsCfg))}
-	cfg := &Config{Port: port, EnableTranslibWrite: true, EnableNativeWrite: true, Threshold: 100}
+	cfg := &Config{
+		Port:                port,
+		EnableTranslibWrite: true,
+		EnableNativeWrite:   true,
+		Threshold:           100,
+		ImgDir:              "/tmp",
+	}
 	s, err := NewServer(cfg, opts)
 	if err != nil {
 		t.Errorf("Failed to create gNMI server: %v", err)
@@ -151,7 +157,11 @@ func createReadServer(t *testing.T, port int64) *Server {
 	}
 
 	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsCfg))}
-	cfg := &Config{Port: port, EnableTranslibWrite: false}
+	cfg := &Config{
+		Port:                port,
+		EnableTranslibWrite: false,
+		ImgDir:              "/tmp",
+	}
 	s, err := NewServer(cfg, opts)
 	if err != nil {
 		t.Fatalf("Failed to create gNMI server: %v", err)
@@ -170,7 +180,12 @@ func createRejectServer(t *testing.T, port int64) *Server {
 	}
 
 	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsCfg))}
-	cfg := &Config{Port: port, EnableTranslibWrite: true, Threshold: 2}
+	cfg := &Config{
+		Port:                port,
+		EnableTranslibWrite: true,
+		Threshold:           2,
+		ImgDir:              "/tmp",
+	}
 	s, err := NewServer(cfg, opts)
 	if err != nil {
 		t.Fatalf("Failed to create gNMI server: %v", err)
@@ -190,7 +205,12 @@ func createAuthServer(t *testing.T, port int64) *Server {
 	}
 
 	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsCfg))}
-	cfg := &Config{Port: port, EnableTranslibWrite: true, UserAuth: AuthTypes{"password": true, "cert": true, "jwt": true}}
+	cfg := &Config{
+		Port:                port,
+		EnableTranslibWrite: true,
+		UserAuth:            AuthTypes{"password": true, "cert": true, "jwt": true},
+		ImgDir:              "/tmp",
+	}
 	s, err := NewServer(cfg, opts)
 	if err != nil {
 		t.Fatalf("Failed to create gNMI server: %v", err)
@@ -235,7 +255,14 @@ func createKeepAliveServer(t *testing.T, port int64) *Server {
 		grpc.KeepaliveParams(keep_alive_params),
 	}
 	server_opts = append(server_opts, opts[0])
-	cfg := &Config{Port: port, EnableTranslibWrite: true, EnableNativeWrite: true, Threshold: 100}
+	cfg := &Config{
+		Port:                port,
+		EnableTranslibWrite: true,
+		EnableNativeWrite:   true,
+		Threshold:           100,
+		ImgDir:              "/tmp",
+	}
+
 	s, err := NewServer(cfg, server_opts)
 	if err != nil {
 		t.Errorf("Failed to create gNMI server: %v", err)
@@ -747,6 +774,36 @@ func initFullCountersDb(t *testing.T, namespace string) {
 	mpi_fab_counter_1 := loadConfig(t, "COUNTERS:oid:0x1000000000082", countersPort1_Byte)
 	loadDB(t, rclient, mpi_fab_counter_1)
 
+	// Load ACL_COUNTER_RULE_MAP and ACL counters
+	fileName = "../testdata/ACL_COUNTER_RULE_MAP.json"
+	aclRuleMapByte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("failed to open %s, err: %v", fileName, err)
+	}
+
+	aclRuleMap := loadConfig(t, "ACL_COUNTER_RULE_MAP", aclRuleMapByte)
+	loadDB(t, rclient, aclRuleMap)
+
+	// ACL counter for DATAACL:DEFAULT_RULE -> oid:0x900000000070f
+	fileName = "../testdata/COUNTERS:oid:0x900000000070f.txt"
+	aclDefaultCounterByte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("failed to open %s, err: %v", fileName, err)
+	}
+
+	aclDefaultCounter := loadConfig(t, "COUNTERS:oid:0x900000000070f", aclDefaultCounterByte)
+	loadDB(t, rclient, aclDefaultCounter)
+
+	// ACL counter for DATAACL:RULE_1 -> oid:0x9000000000711
+	fileName = "../testdata/COUNTERS:oid:0x9000000000711.txt"
+	aclRule1CounterByte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("failed to open %s, err: %v", fileName, err)
+	}
+
+	aclRule1Counter := loadConfig(t, "COUNTERS:oid:0x9000000000711", aclRule1CounterByte)
+	loadDB(t, rclient, aclRule1Counter)
+
 	fileName = "../testdata/COUNTERS_DEBUG_NAME_SWITCH_STAT_MAP.txt"
 	countersDebugNameSwitchStatMapByte, err := ioutil.ReadFile(fileName)
 	if err != nil {
@@ -971,6 +1028,60 @@ func prepareDb(t *testing.T, namespace string) {
 	}
 	mpi_switch_counter := loadConfig(t, "COUNTERS:oid:0x21000000000000", countersSwitch_id_Byte)
 	loadDB(t, rclient, mpi_switch_counter)
+
+	fileName = "../testdata/COUNTERS_SRV6_NAME_MAP.json"
+	countersSRv6NameMapByte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("read file %v err: %v", fileName, err)
+	}
+	counters_srv6_name_map := loadConfig(t, "COUNTERS_SRV6_NAME_MAP", countersSRv6NameMapByte)
+	loadDB(t, rclient, counters_srv6_name_map)
+
+	// Load ACL_COUNTER_RULE_MAP and ACL counters
+	fileName = "../testdata/ACL_COUNTER_RULE_MAP.json"
+	aclRuleMapByte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("failed to open %s, err: %v", fileName, err)
+	}
+
+	aclRuleMap := loadConfig(t, "ACL_COUNTER_RULE_MAP", aclRuleMapByte)
+	loadDB(t, rclient, aclRuleMap)
+
+	// ACL counter for DATAACL:DEFAULT_RULE -> oid:0x900000000070f
+	fileName = "../testdata/COUNTERS:oid:0x900000000070f.txt"
+	aclDefaultCounterByte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("failed to open %s, err: %v", fileName, err)
+	}
+
+	aclDefaultCounter := loadConfig(t, "COUNTERS:oid:0x900000000070f", aclDefaultCounterByte)
+	loadDB(t, rclient, aclDefaultCounter)
+
+	// ACL counter for DATAACL:RULE_1 -> oid:0x9000000000711
+	fileName = "../testdata/COUNTERS:oid:0x9000000000711.txt"
+	aclRule1CounterByte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("failed to open %s, err: %v", fileName, err)
+	}
+
+	aclRule1Counter := loadConfig(t, "COUNTERS:oid:0x9000000000711", aclRule1CounterByte)
+	loadDB(t, rclient, aclRule1Counter)
+
+	fileName = "../testdata/COUNTERS:oid:0x54000000004f63.txt"
+	sid1_byte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("read file %v err: %v", fileName, err)
+	}
+	sid1_counter := loadConfig(t, "COUNTERS:oid:0x54000000004f63", sid1_byte)
+	loadDB(t, rclient, sid1_counter)
+
+	fileName = "../testdata/COUNTERS:oid:0x54000000004f64.txt"
+	sid2_byte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("read file %v err: %v", fileName, err)
+	}
+	sid2_counter := loadConfig(t, "COUNTERS:oid:0x54000000004f64", sid2_byte)
+	loadDB(t, rclient, sid2_counter)
 
 	// Load CONFIG_DB for alias translation
 	prepareConfigDb(t, namespace)
@@ -1557,6 +1668,31 @@ func runGnmiTestGet(t *testing.T, namespace string) {
 		t.Fatalf("read file %v err: %v", fileName, err)
 	}
 
+	fileName = "../testdata/COUNTERS:SID_wildcard.json"
+	countersSidWildcardByte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("read file %v err: %v", fileName, err)
+	}
+
+	fileName = "../testdata/COUNTERS:SID_single_entry.json"
+	countersSidSingleEntryByte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("read file %v err: %v", fileName, err)
+	}
+
+	// ACL counters test vectors
+	fileName = "../testdata/COUNTERS:ACL_wildcard.json"
+	countersAclWildcardByte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("failed to open %s, err: %v", fileName, err)
+	}
+
+	fileName = "../testdata/COUNTERS:ACL_single_entry.json"
+	countersAclSingleEntryByte, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("failed to open %s, err: %v", fileName, err)
+	}
+
 	stateDBPath := "STATE_DB"
 
 	ns, _ := sdcfg.GetDbDefaultNamespace()
@@ -1813,6 +1949,70 @@ func runGnmiTestGet(t *testing.T, namespace string) {
 			pathTarget:  stateDBPath,
 			textPbPath:  ``,
 			valTest:     true,
+			wantRetCode: codes.NotFound,
+		}, {
+			desc:       "get COUNTERS:SID*",
+			pathTarget: "COUNTERS_DB",
+			textPbPath: `
+					elem: <name: "COUNTERS" >
+					elem: <name: "SID*" >
+				`,
+			wantRetCode: codes.OK,
+			wantRespVal: countersSidWildcardByte,
+			valTest:     true,
+		}, {
+			desc:       "get COUNTERS:SID:fcbb:bbbb:2::/48",
+			pathTarget: "COUNTERS_DB",
+			textPbPath: `
+					elem: <name: "COUNTERS" >
+					elem: <name: "SID:fcbb:bbbb:2::/48" >
+				`,
+			wantRetCode: codes.OK,
+			wantRespVal: countersSidSingleEntryByte,
+			valTest:     true,
+		}, {
+			desc:       "get COUNTERS:ACL_RULE*",
+			pathTarget: "COUNTERS_DB",
+			textPbPath: `
+                elem: <
+                    name: "COUNTERS"
+                >
+                elem: <
+                    name: "ACL_RULE*"
+                >
+            `,
+			wantRetCode: codes.OK,
+			wantRespVal: countersAclWildcardByte,
+			valTest:     true,
+		}, {
+			desc:       "get COUNTERS:ACL_RULE:DATAACL:RULE_1",
+			pathTarget: "COUNTERS_DB",
+			textPbPath: `
+                elem: <
+                    name: "COUNTERS"
+                >
+                elem: <
+                    name: "ACL_RULE:DATAACL:RULE_1"
+                >
+            `,
+			wantRetCode: codes.OK,
+			wantRespVal: countersAclSingleEntryByte,
+			valTest:     true,
+		}, {
+			desc:       "get COUNTERS:fcbb:bbbb:2::/48 -- malformed",
+			pathTarget: "COUNTERS_DB",
+			textPbPath: `
+					elem: <name: "COUNTERS" >
+					elem: <name: "fcbb:bbbb:2::/48" >
+				`,
+			wantRetCode: codes.NotFound,
+		}, {
+			desc:       "get COUNTERS:fcbb:bbbb:3::/48 -- not existing",
+			pathTarget: "COUNTERS_DB",
+			textPbPath: `
+					elem: <name: "COUNTERS" >
+					elem: <name: "SID:fcbb:bbbb:3::/48" >
+				`,
 			wantRetCode: codes.NotFound,
 		},
 
@@ -2260,7 +2460,37 @@ func runTestSubscribe(t *testing.T, namespace string) {
 	tmp6.(map[string]interface{})["Ethernet68/1:3"].(map[string]interface{})["PFC_WD_QUEUE_STATS_DEADLOCK_DETECTED"] = "1"
 	countersEthernetWildPfcwdUpdate := tmp6
 
-	///////////////////////////////////////////////////////////////////////////////////////////////
+	var countersSidCountersWildcardJson interface{}
+	// for SID* subscription
+	fileName = "../testdata/COUNTERS:SID_wildcard.json"
+	countersSidWildcardByte, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("read file %v err: %v", fileName, err)
+	}
+	json.Unmarshal(countersSidWildcardByte, &countersSidCountersWildcardJson)
+	//The update with new value
+	tmp = map[string]interface{}{"SAI_COUNTER_STAT_PACKETS": "4", "SAI_COUNTER_STAT_BYTES": "0"}
+	singleSidCounterJsonUpdate := make(map[string]interface{})
+	singleSidCounterJsonUpdate["fcbb:bbbb:1::/48"] = tmp
+
+	// ACL counters wildcard + single entry update for subscriptions
+	var countersAclCountersWildcardJson interface{}
+	fileName = "../testdata/COUNTERS:ACL_wildcard.json"
+	countersAclWildcardByte, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("failed to open %s, err: %v", fileName, err)
+	}
+	err = json.Unmarshal(countersAclWildcardByte, &countersAclCountersWildcardJson)
+	if err != nil {
+		t.Fatalf("failed to unmarshal %s, err: %v", fileName, err)
+	}
+
+	tmp = map[string]interface{}{
+		"SAI_ACL_COUNTER_ATTR_PACKETS": "4",
+		"SAI_ACL_COUNTER_ATTR_BYTES":   "0",
+	}
+	singleAclCounterJsonUpdate := make(map[string]interface{})
+	singleAclCounterJsonUpdate["DATAACL:RULE_1"] = tmp
 
 	fileName = "../testdata/COUNTERS:Ethernet_wildcard_Queues_alias.txt"
 	countersEthernetWildQueuesByte, err := ioutil.ReadFile(fileName)
@@ -3396,6 +3626,126 @@ func runTestSubscribe(t *testing.T, namespace string) {
 				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "Ethernet*", "Pfcwd"}, TS: time.Unix(0, 200), Val: map[string]interface{}{}}, //empty update
 				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "Ethernet*", "Pfcwd"}, TS: time.Unix(0, 200), Val: countersEthernet68PfcwdAliasJsonUpdate},
 				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "Ethernet*", "Pfcwd"}, TS: time.Unix(0, 200), Val: map[string]interface{}{}}, //empty update
+			},
+		},
+		{
+			desc: "poll query for COUNTERS/SID* with field value change",
+			poll: 3,
+			q: client.Query{
+				Target:  "COUNTERS_DB",
+				Type:    client.Poll,
+				Queries: []client.Path{{"COUNTERS", "SID*"}},
+				TLS:     &tls.Config{InsecureSkipVerify: true},
+			},
+			updates: []tablePathValue{
+				{
+					dbName:    "COUNTERS_DB",
+					tableName: "COUNTERS",
+					tableKey:  "oid:0x54000000004f63",
+					delimitor: ":",
+					field:     "SAI_COUNTER_STAT_PACKETS",
+					value:     "4", // being changed to 4 from 0
+				},
+			},
+			wantNoti: []client.Notification{
+				client.Connected{},
+				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "SID*"}, TS: time.Unix(0, 200), Val: countersSidCountersWildcardJson},
+				client.Sync{},
+				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "SID*"}, TS: time.Unix(0, 200), Val: mergeStrMaps(countersSidCountersWildcardJson, singleSidCounterJsonUpdate)},
+				client.Sync{},
+				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "SID*"}, TS: time.Unix(0, 200), Val: mergeStrMaps(countersSidCountersWildcardJson, singleSidCounterJsonUpdate)},
+				client.Sync{},
+				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "SID*"}, TS: time.Unix(0, 200), Val: mergeStrMaps(countersSidCountersWildcardJson, singleSidCounterJsonUpdate)},
+				client.Sync{},
+			},
+		},
+		{
+			desc: "stream query for table key SID* with field value update",
+			q:    createCountersDbQueryOnChangeMode(t, "COUNTERS", "SID*"),
+			updates: []tablePathValue{
+				createCountersTableSetUpdate("oid:0x54000000004f63", "SAI_COUNTER_STAT_PACKETS", "4"),
+			},
+			wantNoti: []client.Notification{
+				client.Connected{},
+				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "SID*"}, TS: time.Unix(0, 200), Val: countersSidCountersWildcardJson},
+				client.Sync{},
+				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "SID*"}, TS: time.Unix(0, 200), Val: singleSidCounterJsonUpdate},
+			},
+		},
+		{
+			desc:              "sample stream query for table key SID* with field value update",
+			q:                 createCountersDbQuerySampleMode(t, 0, false, "COUNTERS", "SID*"),
+			generateIntervals: true,
+			updates: []tablePathValue{
+				createCountersTableSetUpdate("oid:0x54000000004f63", "SAI_COUNTER_STAT_PACKETS", "4"),
+			},
+			wantNoti: []client.Notification{
+				client.Connected{},
+				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "SID*"}, TS: time.Unix(0, 200), Val: countersSidCountersWildcardJson},
+				client.Sync{},
+				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "SID*"}, TS: time.Unix(0, 200), Val: mergeStrMaps(countersSidCountersWildcardJson, singleSidCounterJsonUpdate)},
+			},
+		},
+		{
+			desc: "poll query for COUNTERS/ACL_RULE*",
+			poll: 3,
+			q: client.Query{
+				Target:  "COUNTERS_DB",
+				Type:    client.Poll,
+				Queries: []client.Path{{"COUNTERS", "ACL_RULE*"}},
+				TLS:     &tls.Config{InsecureSkipVerify: true},
+			},
+			updates: []tablePathValue{
+				// simulate ACL packets increase on DATAACL:RULE_1
+				{
+					dbName:    "COUNTERS_DB",
+					tableName: "COUNTERS",
+					tableKey:  "oid:0x9000000000711",
+					delimitor: ":",
+					field:     "SAI_ACL_COUNTER_ATTR_PACKETS",
+					value:     "4",
+				},
+			},
+			wantNoti: []client.Notification{
+				client.Connected{},
+				client.Update{
+					Path: []string{"COUNTERS_DB", "COUNTERS", "ACL_RULE*"},
+					TS:   time.Unix(0, 200),
+					Val:  countersAclCountersWildcardJson,
+				},
+				client.Sync{},
+				client.Update{
+					Path: []string{"COUNTERS_DB", "COUNTERS", "ACL_RULE*"},
+					TS:   time.Unix(0, 200),
+					Val:  mergeStrMaps(countersAclCountersWildcardJson, singleAclCounterJsonUpdate),
+				},
+				client.Sync{},
+				client.Update{
+					Path: []string{"COUNTERS_DB", "COUNTERS", "ACL_RULE*"},
+					TS:   time.Unix(0, 200),
+					Val:  mergeStrMaps(countersAclCountersWildcardJson, singleAclCounterJsonUpdate),
+				},
+				client.Sync{},
+				client.Update{
+					Path: []string{"COUNTERS_DB", "COUNTERS", "ACL_RULE*"},
+					TS:   time.Unix(0, 200),
+					Val:  mergeStrMaps(countersAclCountersWildcardJson, singleAclCounterJsonUpdate),
+				},
+				client.Sync{},
+			},
+		},
+		{
+			desc:              "sample stream query for table key ACL_RULE* with field value update",
+			q:                 createCountersDbQuerySampleMode(t, 0, false, "COUNTERS", "ACL_RULE*"),
+			generateIntervals: true,
+			updates: []tablePathValue{
+				createCountersTableSetUpdate("oid:0x9000000000711", "SAI_ACL_COUNTER_ATTR_PACKETS", "4"),
+			},
+			wantNoti: []client.Notification{
+				client.Connected{},
+				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "ACL_RULE*"}, TS: time.Unix(0, 200), Val: countersAclCountersWildcardJson},
+				client.Sync{},
+				client.Update{Path: []string{"COUNTERS_DB", "COUNTERS", "ACL_RULE*"}, TS: time.Unix(0, 200), Val: mergeStrMaps(countersAclCountersWildcardJson, singleAclCounterJsonUpdate)},
 			},
 		},
 	}

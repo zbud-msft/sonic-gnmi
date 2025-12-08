@@ -3,11 +3,19 @@ package host_service
 import (
 	"fmt"
 	"reflect"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/godbus/dbus/v5"
 	log "github.com/golang/glog"
 	"github.com/sonic-net/sonic-gnmi/common_utils"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+var (
+	osMu sync.Mutex
 )
 
 type Service interface {
@@ -34,8 +42,13 @@ type Service interface {
 	ListImages() (string, error)
 	ActivateImage(image string) error
 	FactoryReset(cmd string) (string, error)
+	//Healthz Service APIs
+	HealthzAck(req string) (string, error)
+	HealthzCheck(req string) (string, error)
+	HealthzCollect(req string) (string, error)
 	// Docker services APIs
 	LoadDockerImage(image string) error
+	InstallOS(req string) (string, error)
 }
 
 type DbusClient struct {
@@ -323,6 +336,91 @@ func (c *DbusClient) FactoryReset(cmd string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("Invalid result type %v: expected string, got %T", reflect.TypeOf(result), result)
 	}
+	return strResult, nil
+}
 
+func (c *DbusClient) InstallOS(req string) (string, error) {
+	common_utils.IncCounter(common_utils.GNOI_OS_INSTALL)
+	modName := "image_service"
+	busName := c.busNamePrefix + modName
+	busPath := c.busPathPrefix + modName
+	intName := c.intNamePrefix + modName + ".gnoi_install_os"
+
+	log.Infof("InstallOS: DbusClient called")
+	osMu.Lock()
+	defer osMu.Unlock()
+	result, err := DbusApi(busName, busPath, intName /*timeout=*/, 60, req)
+	if err != nil {
+		if strings.Contains(err.Error(), "ERROR_UNIMPLEMENTED") {
+			log.Infof("InstallOS: Error %v", err)
+			return "", status.Errorf(codes.Unimplemented, "%s", err)
+		}
+		log.Infof("InstallOS: Error %v", err)
+		return "", err
+	}
+	strResult, ok := result.(string)
+	if !ok {
+		log.Infof("InstallOS: Invalid result type %v %v", result, reflect.TypeOf(result))
+		return "", fmt.Errorf("Invalid result type %v %v", result, reflect.TypeOf(result))
+	}
+	if strings.Contains(strResult, "ERROR_UNIMPLEMENTED") {
+		log.Infof("InstallOS: Result %v", strResult)
+		return "", status.Errorf(codes.Unimplemented, "%s", strResult)
+	}
+	log.Infof("InstallOS: Result %v", strResult)
+	return strResult, nil
+}
+
+func (c *DbusClient) HealthzCheck(req string) (string, error) {
+	modName := "debug_info"
+	busName := c.busNamePrefix + modName
+	busPath := c.busPathPrefix + modName
+	intName := c.intNamePrefix + modName + ".check"
+
+	common_utils.IncCounter(common_utils.GNOI_HEALTHZ_CHECK)
+	result, err := DbusApi(busName, busPath, intName /*timeout=*/, 10, req)
+	if err != nil {
+		return "", err
+	}
+	strResult, ok := result.(string)
+	if !ok {
+		return "", fmt.Errorf("Invalid result type %v %v", result, reflect.TypeOf(result))
+	}
+	return strResult, nil
+}
+
+func (c *DbusClient) HealthzCollect(req string) (string, error) {
+	modName := "debug_info"
+	busName := c.busNamePrefix + modName
+	busPath := c.busPathPrefix + modName
+	intName := c.intNamePrefix + modName + ".collect"
+
+	common_utils.IncCounter(common_utils.GNOI_HEALTHZ_COLLECT)
+	result, err := DbusApi(busName, busPath, intName /*timeout=*/, 10, req)
+	if err != nil {
+		return "", err
+	}
+	strResult, ok := result.(string)
+	if !ok {
+		return "", fmt.Errorf("Invalid result type %v %v", result, reflect.TypeOf(result))
+	}
+	return strResult, nil
+}
+
+func (c *DbusClient) HealthzAck(req string) (string, error) {
+	modName := "debug_info"
+	busName := c.busNamePrefix + modName
+	busPath := c.busPathPrefix + modName
+	intName := c.intNamePrefix + modName + ".ack"
+
+	common_utils.IncCounter(common_utils.GNOI_HEALTHZ_ACK)
+	result, err := DbusApi(busName, busPath, intName /*timeout=*/, 10, req)
+	if err != nil {
+		return "", err
+	}
+	strResult, ok := result.(string)
+	if !ok {
+		return "", fmt.Errorf("Invalid result type %v %v", result, reflect.TypeOf(result))
+	}
 	return strResult, nil
 }

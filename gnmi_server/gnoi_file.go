@@ -7,7 +7,11 @@ import (
 
 	log "github.com/golang/glog"
 	gnoi_file_pb "github.com/openconfig/gnoi/file"
+	gnoifile "github.com/sonic-net/sonic-gnmi/pkg/gnoi/file"
 	ssc "github.com/sonic-net/sonic-gnmi/sonic_service_client"
+
+	// Renamed local package alias to avoid redeclaration / collision.
+	filepkg "github.com/sonic-net/sonic-gnmi/pkg/gnoi/file"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -96,7 +100,8 @@ func (srv *FileServer) Get(req *gnoi_file_pb.GetRequest, stream gnoi_file_pb.Fil
 	return status.Errorf(codes.Unimplemented, "Method file.Get is unimplemented.")
 }
 
-// TransferToRemote RPC is unimplemented.
+// TransferToRemote downloads a file from a remote URL.
+// If DPU headers are present (HandleOnNPU mode), it downloads to NPU then uploads to the specified DPU.
 func (srv *FileServer) TransferToRemote(ctx context.Context, req *gnoi_file_pb.TransferToRemoteRequest) (*gnoi_file_pb.TransferToRemoteResponse, error) {
 	log.Infof("GNOI File TransferToRemote RPC called with request: %+v", req)
 	_, err := authenticate(srv.config, ctx, "gnoi", false)
@@ -104,11 +109,13 @@ func (srv *FileServer) TransferToRemote(ctx context.Context, req *gnoi_file_pb.T
 		log.Errorf("authentication failed in TransferToRemote RPC: %v", err)
 		return nil, err
 	}
-	log.Warning("file.TransferToRemote RPC is unimplemented")
-	return nil, status.Errorf(codes.Unimplemented, "Method file.TransferToRemote is unimplemented.")
+
+	// Delegate all logic to the pure handler function
+	return gnoifile.HandleTransferToRemote(ctx, req)
 }
 
-// Put RPC is unimplemented.
+// Put implements the gNOI File.Put RPC.
+// It authenticates the request and delegates to the pure Go handler.
 func (srv *FileServer) Put(stream gnoi_file_pb.File_PutServer) error {
 	log.Infof("GNOI File Put RPC called")
 	_, err := authenticate(srv.config, stream.Context(), "gnoi", false)
@@ -116,8 +123,7 @@ func (srv *FileServer) Put(stream gnoi_file_pb.File_PutServer) error {
 		log.Errorf("authentication failed in Put RPC: %v", err)
 		return err
 	}
-	log.Warning("file.Put RPC is unimplemented")
-	return status.Errorf(codes.Unimplemented, "Method file.Put is unimplemented.")
+	return gnoifile.HandlePut(stream)
 }
 
 // Remove implements the corresponding RPC.
@@ -132,17 +138,6 @@ func (srv *FileServer) Remove(ctx context.Context, req *gnoi_file_pb.RemoveReque
 		log.Errorf("authentication failed in Remove RPC: %v", err)
 		return nil, err
 	}
-	if req.GetRemoteFile() == "" {
-		log.Errorf("Invalid request: remote_file field is empty")
-		return nil, status.Error(codes.InvalidArgument, "Invalid request: remote_file field is empty.")
-	}
-	sc, err := ssc.NewDbusClient()
-	if err != nil {
-		log.Errorf("NewDbusClient error: %v", err)
-		return nil, err
-	}
-	defer sc.Close()
-	err = sc.RemoveFile(req.GetRemoteFile())
-	log.Errorf("Remove RPC failed: %v", err)
-	return &gnoi_file_pb.RemoveResponse{}, err
+	// Delegate to handler (all logic except authentication is in the handler)
+	return filepkg.HandleFileRemove(ctx, req)
 }
